@@ -4,6 +4,6 @@
   "version": "1.8.1",
   "minAppVersion": "1.5.0",
   "description": "Open and edit .txt files as plain text without Markdown formatting or automatic indentation.",
-  "author": "Local",
+  "author": "rk009",
   "isDesktopOnly": false
 }
