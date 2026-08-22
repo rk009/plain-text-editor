@@ -107,7 +107,6 @@ class PlainTextView extends TextFileView {
     this.editor = this.contentEl.createEl("textarea", {
       cls: "plain-text-viewer__editor",
       attr: {
-        "aria-label": "Plain text editor",
         "autocomplete": "off",
         "autocapitalize": "off",
         "spellcheck": "false",
