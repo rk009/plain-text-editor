@@ -1,4 +1,13 @@
-const { moment, Notice, Plugin, PluginSettingTab, Setting, TextFileView } = require("obsidian");
+const {
+  moment,
+  normalizePath,
+  Notice,
+  Plugin,
+  PluginSettingTab,
+  Setting,
+  TextFileView,
+  TFolder
+} = require("obsidian");
 
 const VIEW_TYPE_PLAIN_TEXT = "plain-text-view";
 const DEFAULT_SETTINGS = {
@@ -26,7 +35,10 @@ const TRANSLATIONS = {
     obsidianDefaultSize: "Obsidian default size",
     readableLineLength: "Readable line length",
     readableLineLengthDesc: "Limit the text width to 100px wider than Obsidian's default line width.",
-    characters: "characters"
+    characters: "characters",
+    newTextNote: "New text note",
+    untitled: "Untitled",
+    createFailed: "Could not create the text file"
   },
   ja: {
     fileName: "ファイル名",
@@ -46,7 +58,10 @@ const TRANSLATIONS = {
     obsidianDefaultSize: "Obsidianの標準サイズ",
     readableLineLength: "読みやすい長さの行に調整",
     readableLineLengthDesc: "Obsidianの標準行幅より100px広い幅に、テキストの表示幅を制限します。",
-    characters: "文字"
+    characters: "文字",
+    newTextNote: "新規ノート（txt）",
+    untitled: "無題",
+    createFailed: "テキストファイルを作成できませんでした"
   }
 };
 
@@ -340,6 +355,16 @@ module.exports = class PlainTextEditorPlugin extends Plugin {
     this.registerEvent(
       this.app.workspace.on("active-leaf-change", () => this.updateCharacterCount())
     );
+    this.registerEvent(
+      this.app.workspace.on("file-menu", (menu, file) => {
+        menu.addItem((item) =>
+          item
+            .setTitle(t("newTextNote"))
+            .setIcon("file-plus-2")
+            .onClick(() => void this.createTextFile(file))
+        );
+      })
+    );
     this.app.workspace.onLayoutReady(() => this.updateCharacterCount());
     this.register(() => {
       if (this.characterCountFrame !== null) {
@@ -361,6 +386,35 @@ module.exports = class PlainTextEditorPlugin extends Plugin {
       if (leaf.view instanceof PlainTextView) {
         leaf.view.applySettings();
       }
+    }
+  }
+
+  async createTextFile(contextFile) {
+    const folder = contextFile instanceof TFolder
+      ? contextFile
+      : contextFile?.parent;
+    const folderPath = folder?.path ? `${folder.path}/` : "";
+    const baseName = t("untitled");
+    let sequence = 0;
+    let path;
+
+    do {
+      const suffix = sequence === 0 ? "" : ` ${sequence}`;
+      path = normalizePath(`${folderPath}${baseName}${suffix}.txt`);
+      sequence += 1;
+    } while (this.app.vault.getAbstractFileByPath(path));
+
+    try {
+      const file = await this.app.vault.create(path, "");
+      const leaf = this.app.workspace.getLeaf(false);
+      await leaf.openFile(file);
+
+      if (leaf.view instanceof PlainTextView && leaf.view.inlineTitleEl) {
+        leaf.view.inlineTitleEl.focus();
+        leaf.view.inlineTitleEl.select();
+      }
+    } catch (error) {
+      new Notice(`${t("createFailed")}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
