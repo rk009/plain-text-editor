@@ -51,9 +51,14 @@
 }
 
 .plain-text-viewer--readable-line-width .plain-text-viewer__editor {
-  max-width: calc(var(--file-line-width) + 100px);
-  margin-right: auto;
-  margin-left: auto;
+  padding-right: max(
+    var(--size-4-4),
+    calc((100% - var(--file-line-width) - 100px) / 2 + var(--size-4-4))
+  );
+  padding-left: max(
+    var(--size-4-4),
+    calc((100% - var(--file-line-width) - 100px) / 2 + var(--size-4-4))
+  );
 }
 
 .plain-text-viewer--readable-line-width .plain-text-viewer__title {
