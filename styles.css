@@ -1,11 +1,11 @@
-.plain-text-viewer {
+.plain-text-editor {
   display: flex;
   flex-direction: column;
   height: 100%;
   padding: 0;
 }
 
-.plain-text-viewer__title {
+.plain-text-editor__title {
   display: block;
   flex: 0 0 auto;
   width: 100%;
@@ -26,7 +26,7 @@
   font-weight: var(--inline-title-weight);
 }
 
-.plain-text-viewer__editor {
+.plain-text-editor__editor {
   display: block;
   width: 100%;
   flex: 1 1 auto;
@@ -50,7 +50,7 @@
   tab-size: 4;
 }
 
-.plain-text-viewer--readable-line-width .plain-text-viewer__editor {
+.plain-text-editor--readable-line-width .plain-text-editor__editor {
   padding-right: max(
     var(--size-4-4),
     calc((100% - var(--file-line-width) - 100px) / 2 + var(--size-4-4))
@@ -61,12 +61,12 @@
   );
 }
 
-.plain-text-viewer--readable-line-width .plain-text-viewer__title {
+.plain-text-editor--readable-line-width .plain-text-editor__title {
   max-width: calc(var(--file-line-width) + 100px);
   margin-right: auto;
   margin-left: auto;
 }
 
-body.plain-text-viewer-is-active .status-bar-item.plugin-word-count {
+body.plain-text-editor-is-active .status-bar-item.plugin-word-count {
   display: none;
 }

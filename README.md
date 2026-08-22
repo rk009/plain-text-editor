@@ -1,4 +1,4 @@
-# Plain Text Viewer
+# Plain Text Editor
 
 An Obsidian plugin for opening and editing `.txt` files directly in a vault without converting them to Markdown.
 
@@ -18,10 +18,10 @@ An Obsidian plugin for opening and editing `.txt` files directly in a vault with
 Copy `main.js`, `manifest.json`, and `styles.css` into:
 
 ```text
-<vault>/.obsidian/plugins/plain-text-viewer/
+<vault>/.obsidian/plugins/plain-text-editor/
 ```
 
-Then reload Obsidian and enable **Plain Text Viewer** under **Settings → Community plugins**.
+Then reload Obsidian and enable **Plain Text Editor** under **Settings → Community plugins**.
 
 ## Development
 

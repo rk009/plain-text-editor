@@ -78,10 +78,10 @@ class PlainTextView extends TextFileView {
 
   async onOpen() {
     this.contentEl.empty();
-    this.contentEl.addClass("plain-text-viewer");
+    this.contentEl.addClass("plain-text-editor");
 
     this.inlineTitleEl = this.contentEl.createEl("input", {
-      cls: "plain-text-viewer__title inline-title",
+      cls: "plain-text-editor__title inline-title",
       attr: {
         type: "text",
         "aria-label": t("fileName"),
@@ -105,7 +105,7 @@ class PlainTextView extends TextFileView {
     });
 
     this.editor = this.contentEl.createEl("textarea", {
-      cls: "plain-text-viewer__editor",
+      cls: "plain-text-editor__editor",
       attr: {
         "autocomplete": "off",
         "autocapitalize": "off",
@@ -201,13 +201,13 @@ class PlainTextView extends TextFileView {
     }
 
     this.contentEl.toggleClass(
-      "plain-text-viewer--readable-line-width",
+      "plain-text-editor--readable-line-width",
       this.plugin.settings.readableLineLength
     );
   }
 }
 
-class PlainTextViewerSettingTab extends PluginSettingTab {
+class PlainTextEditorSettingTab extends PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -314,12 +314,12 @@ class PlainTextViewerSettingTab extends PluginSettingTab {
   }
 }
 
-module.exports = class PlainTextViewerPlugin extends Plugin {
+module.exports = class PlainTextEditorPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
     this.characterCountFrame = null;
     this.characterCountEl = this.addStatusBarItem();
-    this.characterCountEl.addClass("plain-text-viewer__character-count");
+    this.characterCountEl.addClass("plain-text-editor__character-count");
     this.characterCountEl.hide();
 
     this.registerView(
@@ -327,7 +327,7 @@ module.exports = class PlainTextViewerPlugin extends Plugin {
       (leaf) => new PlainTextView(leaf, this)
     );
     this.registerExtensions(["txt"], VIEW_TYPE_PLAIN_TEXT);
-    this.addSettingTab(new PlainTextViewerSettingTab(this.app, this));
+    this.addSettingTab(new PlainTextEditorSettingTab(this.app, this));
     this.registerEvent(
       this.app.vault.on("rename", (file) => {
         for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_PLAIN_TEXT)) {
@@ -370,7 +370,7 @@ module.exports = class PlainTextViewerPlugin extends Plugin {
     const view = this.app.workspace.activeLeaf?.view;
     if (!(view instanceof PlainTextView)) {
       this.characterCountEl.hide();
-      document.body.removeClass("plain-text-viewer-is-active");
+      document.body.removeClass("plain-text-editor-is-active");
       return;
     }
 
@@ -378,7 +378,7 @@ module.exports = class PlainTextViewerPlugin extends Plugin {
     const characterCount = this.countCharacters(text);
     this.characterCountEl.setText(`${characterCount} ${t("characters")}`);
     this.characterCountEl.show();
-    document.body.addClass("plain-text-viewer-is-active");
+    document.body.addClass("plain-text-editor-is-active");
   }
 
   scheduleCharacterCount() {
@@ -402,6 +402,6 @@ module.exports = class PlainTextViewerPlugin extends Plugin {
   }
 
   onunload() {
-    document.body.removeClass("plain-text-viewer-is-active");
+    document.body.removeClass("plain-text-editor-is-active");
   }
 };
