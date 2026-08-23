@@ -11,6 +11,8 @@
 - 読みやすい行の長さに制限する設定あり
 - 文字数をリアルタイムで表示
 
+- `Ctrl+F` / `Cmd+F` によるテキスト検索
+- `｜漢字《かんじ》` 形式のルビ表示
 
 ## Installation
 
@@ -24,4 +26,11 @@ Then reload Obsidian and enable **Plain Text Editor** under **Settings → Commu
 
 ## Development
 
-This repository currently contains the compiled plugin files and does not require a build step.
+Install dependencies and build the bundled `main.js` with:
+
+```text
+npm install
+npm run build
+```
+
+The editable source is in `src/main.js`. CodeMirror 6 is bundled into the generated `main.js`.
