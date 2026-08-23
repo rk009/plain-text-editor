@@ -131,10 +131,20 @@ class PlainTextView extends TextFileView {
     this.editor.value = this.data;
     this.applySettings();
 
-    this.registerDomEvent(this.editor, "input", () => {
+    this.isComposing = false;
+    this.registerDomEvent(this.editor, "compositionstart", () => {
+      this.isComposing = true;
+    });
+    this.registerDomEvent(this.editor, "compositionend", () => {
+      this.isComposing = false;
+      this.plugin.scheduleCharacterCount();
+    });
+    this.registerDomEvent(this.editor, "input", (event) => {
       this.data = this.editor.value;
       this.requestSave();
-      this.plugin.scheduleCharacterCount();
+      if (!this.isComposing && !event.isComposing) {
+        this.plugin.scheduleCharacterCount();
+      }
     });
 
     this.plugin.scheduleCharacterCount();
@@ -343,6 +353,11 @@ module.exports = class PlainTextEditorPlugin extends Plugin {
     );
     this.registerExtensions(["txt"], VIEW_TYPE_PLAIN_TEXT);
     this.addSettingTab(new PlainTextEditorSettingTab(this.app, this));
+    this.addCommand({
+      id: "new-text-note",
+      name: t("newTextNote"),
+      callback: () => void this.createTextFile(this.getSelectedNavigatorFolder())
+    });
     this.registerEvent(
       this.app.vault.on("rename", (file) => {
         for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_PLAIN_TEXT)) {
@@ -379,6 +394,12 @@ module.exports = class PlainTextEditorPlugin extends Plugin {
 
   async saveSettings() {
     await this.saveData(this.settings);
+  }
+
+  getSelectedNavigatorFolder() {
+    const navigator = this.app.plugins?.plugins?.["notebook-navigator"]?.api;
+    const navItem = navigator?.selection?.getNavItem?.();
+    return navItem?.type === "folder" ? navItem.folder : this.app.vault.getRoot();
   }
 
   applySettings() {
