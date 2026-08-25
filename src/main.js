@@ -309,6 +309,7 @@ class PlainTextView extends TextFileView {
       if (event.key === "Enter") {
         event.preventDefault();
         this.inlineTitleEl.blur();
+        this.focusEditorStart();
       } else if (event.key === "Escape") {
         event.preventDefault();
         this.updateTitle();
@@ -398,6 +399,15 @@ class PlainTextView extends TextFileView {
 
   focus() {
     this.editor?.focus();
+  }
+
+  focusEditorStart() {
+    if (!this.editor) return;
+    this.editor.dispatch({
+      selection: EditorSelection.cursor(0),
+      scrollIntoView: true
+    });
+    this.editor.focus();
   }
 
   openSearch() {
