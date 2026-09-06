@@ -1,7 +1,7 @@
 {
   "id": "plain-text-editor",
   "name": "Plain Text Editor",
-  "version": "1.11.0",
+  "version": "1.12.0",
   "minAppVersion": "1.5.0",
   "description": "A plain-text editor developed for writing novels in Japanese, without Markdown formatting or automatic indentation.",
   "author": "rk009",

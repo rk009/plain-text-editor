@@ -699,3 +699,4 @@ module.exports = class PlainTextEditorPlugin extends Plugin {
     document.body.removeClass("plain-text-editor-is-active");
   }
 };
+module.exports = require("../navigator-counts")(module.exports);
