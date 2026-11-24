@@ -1,7 +1,9 @@
 const {
+  getIcon,
   moment,
   normalizePath,
   Notice,
+  Platform,
   Plugin,
   PluginSettingTab,
   Setting,
@@ -9,8 +11,18 @@ const {
   TextFileView,
   TFolder
 } = require("obsidian");
-const { EditorSelection, EditorState, Prec } = require("@codemirror/state");
-const { defaultKeymap, history, historyKeymap } = require("@codemirror/commands");
+const { EditorSelection, EditorState, Prec, StateField } = require("@codemirror/state");
+const {
+	cursorDocEnd,
+	cursorDocStart,
+	defaultKeymap,
+	history,
+	historyKeymap,
+	redo,
+	selectDocEnd,
+	selectDocStart,
+	undo
+} = require("@codemirror/commands");
 const {
   SearchQuery,
   closeSearchPanel,
@@ -20,6 +32,7 @@ const {
   openSearchPanel,
   search,
   searchKeymap,
+  searchPanelOpen,
   selectMatches,
   setSearchQuery
 } = require("@codemirror/search");
@@ -32,8 +45,56 @@ const {
 } = require("@codemirror/view");
 
 const VIEW_TYPE_PLAIN_TEXT = "plain-text-view";
+const pendingSearchScrolls = new WeakMap();
+
+const keepScrollOnSearchEdit = StateField.define({
+  create: () => false,
+  update: (_, transaction) => transaction.docChanged && transaction.scrollIntoView &&
+    (transaction.isUserEvent("input") || transaction.isUserEvent("delete")),
+  provide: (field) => EditorView.scrollHandler.of((view) =>
+    view.state.field(field) && searchPanelOpen(view.state)
+  )
+});
+
+function scrollSearchMatchIntoView(view, range) {
+  const doc = view.state.doc;
+  pendingSearchScrolls.set(view, range);
+
+  // This callback runs before CodeMirror dispatches the new selection.
+  // Check the selection on the next frame, after the standard scroll runs.
+  function align(attempt) {
+    view.dom.ownerDocument.defaultView.requestAnimationFrame(() => {
+      if (pendingSearchScrolls.get(view) !== range || !view.dom.isConnected ||
+          view.state.doc !== doc || !searchPanelOpen(view.state) ||
+          !view.state.selection.main.eq(range)) return;
+
+      const scroller = view.scrollDOM;
+      const bounds = scroller.getBoundingClientRect();
+      const match = view.coordsAtPos(range.from, 1);
+      if (!bounds.height) return;
+
+      let offset;
+      if (match) {
+        const center = (bounds.top + bounds.bottom) / 2;
+        offset = (match.top + match.bottom) / 2 - center;
+      } else {
+        const direction = range.from < view.viewport.from ? -1 : 1;
+        offset = direction * bounds.height / 2;
+      }
+      if (Math.abs(offset) <= 2) return;
+      const before = scroller.scrollTop;
+      scroller.scrollTo({ top: before + offset / view.scaleY, behavior: "instant" });
+      if (attempt < 8 && scroller.scrollTop !== before) align(attempt + 1);
+    });
+  }
+  align(0);
+  return EditorView.scrollIntoView(range.from, { y: "center" });
+}
+
+const { cssString, selectFontFace, LocalFontLoader } = require("./local-font");
 const DEFAULT_SETTINGS = {
   fontFamily: "",
+  fontFace: null,
   fontSize: null,
   readableLineLength: false
 };
@@ -66,6 +127,9 @@ const TRANSLATIONS = {
     findPrevious: "Previous",
     findNext: "Next",
     findAll: "All",
+    undo: "Undo",
+    redo: "Redo",
+    hideKeyboard: "Hide keyboard",
     close: "Close"
   },
   ja: {
@@ -95,6 +159,9 @@ const TRANSLATIONS = {
     findPrevious: "戻る",
     findNext: "次",
     findAll: "すべて",
+    undo: "元に戻す",
+    redo: "やり直す",
+    hideKeyboard: "キーボードを閉じる",
     close: "閉じる"
   }
 };
@@ -325,7 +392,9 @@ class PlainTextView extends TextFileView {
         extensions: [
           history(),
           EditorView.lineWrapping,
+          keepScrollOnSearchEdit,
           search({
+            scrollToMatch: (range, view) => scrollSearchMatchIntoView(view, range),
             createPanel: () => {
               const dom = document.createElement("div");
               dom.hidden = true;
@@ -336,6 +405,8 @@ class PlainTextView extends TextFileView {
           Prec.highest(keymap.of([{ key: "Enter", run: insertPlainNewline }])),
           keymap.of([
             ...searchKeymap.filter((binding) => binding.key !== "Mod-f"),
+						{ key: "Home", run: cursorDocStart, shift: selectDocStart },
+						{ key: "End", run: cursorDocEnd, shift: selectDocEnd },
             ...defaultKeymap,
             ...historyKeymap
           ]),
@@ -351,6 +422,7 @@ class PlainTextView extends TextFileView {
     this.searchPanel = new CompactSearchPanel(this.editor, () => this.closeSearch());
     this.searchPanel.dom.hidden = true;
     this.contentEl.insertBefore(this.searchPanel.dom, this.inlineTitleEl);
+    if (Platform.isMobile) this.addMobileToolbar();
     const captureFindShortcut = (event) => {
       if (
         this.editor?.hasFocus &&
@@ -371,6 +443,45 @@ class PlainTextView extends TextFileView {
       this.editor = null;
     });
     this.plugin.scheduleCharacterCount();
+  }
+
+  addMobileToolbar() {
+    const toolbar = this.contentEl.createDiv({ cls: "plain-text-editor__mobile-bar" });
+    const options = toolbar.createDiv({ cls: "mobile-toolbar-options-container" });
+    const list = options.createDiv({ cls: "mobile-toolbar-options-list-container mod-raised" });
+    const editActions = list.createDiv({ cls: "mobile-toolbar-options-list" });
+    const keyboardAction = options.createDiv({ cls: "mobile-toolbar-floating-options mod-raised" });
+    const ownerDocument = toolbar.ownerDocument;
+    const blurInput = () => {
+      const active = ownerDocument.activeElement;
+      if (this.contentEl.contains(active)) active.blur();
+    };
+    const addButton = (group, label, icon, action) => {
+      const button = group.createEl("button", {
+        cls: "mobile-toolbar-option",
+        attr: { type: "button", "aria-label": t(label), title: t(label) }
+      });
+      setIcon(button, icon);
+      // Touching an editing action should leave the editor and keyboard active.
+      this.registerDomEvent(button, "pointerdown", (event) => event.preventDefault());
+      this.registerDomEvent(button, "click", action);
+    };
+    addButton(editActions, "undo", "lucide-undo-2", () => this.editor && undo(this.editor));
+    addButton(editActions, "redo", "lucide-redo-2", () => this.editor && redo(this.editor));
+    const keyboardIcon = getIcon("keyboard-toggle") ? "keyboard-toggle" : "lucide-keyboard";
+    addButton(keyboardAction, "hideKeyboard", keyboardIcon, blurInput);
+
+    const viewport = ownerDocument.defaultView?.visualViewport;
+    if (viewport) {
+      const positionToolbar = () => {
+        const bottom = this.contentEl.getBoundingClientRect().bottom;
+        const inset = Math.max(0, bottom - viewport.offsetTop - viewport.height);
+        toolbar.style.marginBottom = `${inset}px`;
+      };
+      this.registerDomEvent(viewport, "resize", positionToolbar);
+      this.registerDomEvent(viewport, "scroll", positionToolbar);
+      this.registerDomEvent(this.contentEl, "focusin", positionToolbar);
+    }
   }
 
   getViewData() {
@@ -456,9 +567,19 @@ class PlainTextView extends TextFileView {
   applySettings() {
     if (!this.editorHostEl) return;
 
+    const fontRequest = this.fontRequest = {};
     const fontFamily = this.plugin.settings.fontFamily.trim();
+    const metadata = this.plugin.settings.fontFace;
     if (fontFamily) {
-      this.editorHostEl.style.setProperty("--plain-text-font-family", fontFamily);
+      const fallback = metadata?.family === fontFamily ? cssString(fontFamily) : fontFamily;
+      this.editorHostEl.style.setProperty("--plain-text-font-family", fallback);
+      if (metadata?.family === fontFamily) {
+        this.plugin.fontLoader.load(this.editorHostEl.ownerDocument, metadata).then((alias) => {
+          if (this.fontRequest !== fontRequest) return;
+          this.editorHostEl.style.setProperty("--plain-text-font-family", `${alias}, ${fallback}`);
+          this.editor?.requestMeasure();
+        }).catch((error) => console.warn("Plain Text Editor: could not load local font", error));
+      }
     } else {
       this.editorHostEl.style.removeProperty("--plain-text-font-family");
     }
@@ -498,6 +619,7 @@ class PlainTextEditorSettingTab extends PluginSettingTab {
         for (const family of this.systemFonts) dropdown.addOption(family, family);
         dropdown.setValue(current).onChange(async (value) => {
           this.plugin.settings.fontFamily = value;
+          this.plugin.setFontFace(value);
           await this.plugin.saveSettings();
           this.plugin.applySettings();
         });
@@ -512,8 +634,12 @@ class PlainTextEditorSettingTab extends PluginSettingTab {
             throw new Error(t("fontsUnsupported"));
           }
           const fonts = await globalThis.queryLocalFonts();
+          this.plugin.fontLoader.fonts = fonts;
           this.systemFonts = [...new Set(fonts.map((font) => font.family).filter(Boolean))]
             .sort((a, b) => a.localeCompare(b, "ja"));
+          this.plugin.setFontFace(this.plugin.settings.fontFamily);
+          await this.plugin.saveSettings();
+          this.plugin.applySettings();
           this.display();
         } catch (error) {
           button.setDisabled(false);
@@ -534,6 +660,7 @@ class PlainTextEditorSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.fontFamily)
           .onChange(async (value) => {
             this.plugin.settings.fontFamily = value;
+            this.plugin.setFontFace(value.trim());
             await this.plugin.saveSettings();
             this.plugin.applySettings();
           })
@@ -574,6 +701,8 @@ class PlainTextEditorSettingTab extends PluginSettingTab {
 module.exports = class PlainTextEditorPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
+    this.fontLoader = new LocalFontLoader();
+    this.register(() => this.fontLoader.dispose());
     this.characterCountFrame = null;
     this.characterCountEl = this.addStatusBarItem();
     this.characterCountEl.addClass("plain-text-editor__character-count");
@@ -623,6 +752,15 @@ module.exports = class PlainTextEditorPlugin extends Plugin {
 
   async saveSettings() {
     await this.saveData(this.settings);
+  }
+
+  setFontFace(family) {
+    const font = selectFontFace(this.fontLoader.fonts, family);
+    this.settings.fontFace = font ? {
+      family: font.family,
+      fullName: font.fullName,
+      postscriptName: font.postscriptName
+    } : (this.settings.fontFace?.family === family ? this.settings.fontFace : null);
   }
 
   getSelectedNavigatorFolder() {

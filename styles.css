@@ -59,7 +59,7 @@
   min-height: 0;
   overflow: auto;
   padding: var(--size-4-4);
-  font-family: inherit;
+  font-family: var(--plain-text-font-family, var(--font-text));
   line-height: inherit;
 }
 
@@ -69,6 +69,7 @@
 }
 
 .plain-text-editor__editor .cm-content {
+  font-family: var(--plain-text-font-family, var(--font-text));
   min-height: 100%;
   padding: 0;
   caret-color: var(--text-normal);
@@ -86,14 +87,14 @@
   line-height: 1;
 }
 
-.plain-text-editor__editor .cm-searchMatch {
-  background-color: var(--text-highlight-bg);
+.plain-text-editor__editor .cm-content .cm-searchMatch {
+  background-color: transparent;
 }
 
-.plain-text-editor__editor .cm-searchMatch.cm-searchMatch-selected {
-  background-color: var(--interactive-accent) !important;
-  color: var(--text-on-accent) !important;
-  outline: 1px solid var(--interactive-accent-hover);
+.plain-text-editor__editor .cm-content .cm-searchMatch-selected {
+  box-shadow: 0 0 0 3px var(--text-accent);
+  mix-blend-mode: var(--highlight-mix-blend-mode);
+  border-radius: 2px;
 }
 
 .plain-text-editor__search {
@@ -174,6 +175,53 @@
   max-width: calc(var(--file-line-width) + 100px);
   margin-right: auto;
   margin-left: auto;
+}
+
+body.is-mobile .plain-text-editor__editor .cm-scroller {
+  padding-right: 8px;
+  padding-left: 8px;
+}
+
+body.is-mobile .plain-text-editor__editor .cm-content {
+  padding-right: 0;
+  padding-left: 0;
+}
+
+body.is-mobile .plain-text-editor__title {
+  max-width: none;
+  padding-right: 8px !important;
+  padding-left: 8px !important;
+}
+
+.plain-text-editor__mobile-bar {
+  display: none;
+  flex: 0 0 auto;
+  padding-inline: var(--safe-area-inset-left, 0px) var(--safe-area-inset-right, 0px);
+  background: var(--background-primary);
+}
+
+.plain-text-editor:focus-within .plain-text-editor__mobile-bar {
+  display: flex;
+}
+
+.plain-text-editor__mobile-bar > .mobile-toolbar-options-container {
+  justify-content: space-between;
+}
+
+.plain-text-editor__mobile-bar button.mobile-toolbar-option {
+  appearance: none;
+  min-inline-size: var(--toolbar-option-width, 44px);
+  block-size: var(--touch-size-m, 44px);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.plain-text-editor__mobile-bar button.mobile-toolbar-option:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -2px;
 }
 
 body.plain-text-editor-is-active .status-bar-item.plugin-word-count {
